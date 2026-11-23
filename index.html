@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#101e20">
+  <meta name="description" content="在山海经风格的立体河谷里寻找失落机芯，步行、越野、潜水并飞上云端。">
+  <title>山海拾遗</title>
+  <link rel="stylesheet" href="./style.css">
+  <script type="module">
+    import('./game.js').catch(error=>{
+      document.getElementById('start').textContent='渡口未能打开';
+      document.getElementById('load-state').textContent='请通过本地启动器在支持 WebGL 2 的浏览器中打开。';
+      console.error(error);
+    });
+  </script>
+</head>
+<body>
+  <main id="stage" aria-label="山海拾遗三维世界"></main>
+  <div id="grain"></div>
+  <header class="topbar" id="hud" hidden>
+    <div class="wordmark"><span class="seal" aria-hidden="true">山</span><div><strong>山海拾遗</strong><small id="region">拾遗工坊</small></div></div>
+    <div class="tools">
+      <button id="map-open" class="glass" title="地图 M">地图 <kbd>M</kbd></button>
+      <button id="journey-open" class="glass" title="工坊委托 J">委托</button>
+      <button id="expedition-open" class="glass" title="山海异闻 B">异闻</button>
+      <button id="sound" class="glass" aria-pressed="false">开启声音</button>
+      <button id="settings-open" class="glass" title="设置 Esc">设置</button>
+    </div>
+  </header>
+
+  <aside id="clock" class="glass clock" hidden><span id="weather-label"></span><button id="advance-time" title="跳到下个时段"><span id="time-label"></span> ↗</button></aside>
+  <aside id="objective" class="glass objective" aria-label="当前目标" hidden>
+    <div class="objective-copy" aria-live="polite"><small>当前目标</small><strong id="objective-title"></strong><p id="objective-hint"></p></div>
+    <button id="objective-pin" type="button">指路</button>
+  </aside>
+  <aside id="combat" class="glass combat" hidden>
+    <strong id="combat-name"></strong><span id="combat-health"></span>
+    <div class="combat-meter"><i id="combat-meter"></i></div>
+    <small>F 机芯冲击 · 离开追击范围可脱身</small>
+  </aside>
+  <div id="toast" class="toast" role="status"></div>
+  <div id="route-banner" class="route-banner" role="status" hidden><small>路线恢复</small><strong id="route-banner-title"></strong><span id="route-banner-detail"></span></div>
+  <aside id="haul-status" class="glass haul-status" hidden>
+    <div><small id="haul-label">运输中</small><strong id="haul-state">牵引稳定</strong></div><span id="haul-distance"></span>
+    <div class="haul-meter"><i id="haul-progress"></i></div>
+  </aside>
+  <div id="prompt" class="glass prompt" hidden><button id="use"><kbd>E</kbd> <span></span></button><button id="record-swap" hidden>换唱片</button></div>
+  <div id="ferry-tools" class="glass" hidden>
+    <button id="ferry-strap" type="button">系紧药篮</button>
+    <button id="ferry-car-exit" type="button" hidden>回到机器人</button>
+  </div>
+
+  <footer class="playbar" id="playbar" hidden>
+    <div class="forms glass" aria-label="机器人形态">
+      <button data-form="walker" class="selected" aria-pressed="true"><span class="glyph">⟐</span><span>步行<small>走石阶</small></span><kbd>1</kbd></button>
+      <button data-form="rover" aria-pressed="false"><span class="glyph">▱</span><span>履带<small>载人拉货</small></span><kbd>2</kbd></button>
+      <button data-form="boat" aria-pressed="false"><span class="glyph">⛛</span><span>小舟<small>行水与下潜</small></span><kbd>3</kbd></button>
+      <button data-form="sky" aria-pressed="false"><span class="glyph">⋀</span><span>云翼<small>飞向高空</small></span><kbd>4</kbd></button>
+    </div>
+    <div class="quick">
+      <button id="attack" class="glass">冲击 <kbd>F</kbd></button>
+      <button id="bench-open" class="glass">拆装 <kbd>Q</kbd></button>
+      <button id="view" class="glass">视角 <kbd>V</kbd></button>
+    </div>
+    <div class="directions"><span class="pointer-directions">点击地面或水面移动 <span>·</span> WASD 移动 <span>·</span> 拖动转视角</span><span class="touch-directions">轻点地面或水面移动 <span>·</span> 滑动转视角</span></div>
+  </footer>
+  <div id="touch" hidden aria-label="方向控制">
+    <button data-key="KeyW" aria-label="前进">↑</button><button data-key="KeyA" aria-label="向左">←</button>
+    <button data-key="KeyS" aria-label="后退">↓</button><button data-key="KeyD" aria-label="向右">→</button>
+  </div>
+  <button id="immersion-exit" class="glass" type="button">显示界面</button>
+
+  <section id="intro" class="intro">
+    <div class="intro-copy">
+      <p class="place"><span></span> 山海异闻 · 机芯重启</p>
+      <h1>山海<br>拾遗</h1>
+      <p class="subtitle">山海有灵，从河底一路寻到云端。</p>
+      <div class="entry">
+        <button id="start" class="primary" disabled>正在点亮渡口…</button>
+        <button id="start-muted" class="quiet" disabled>静音进入</button>
+        <button id="new-journey" class="quiet" type="button" hidden>进入旅程</button>
+      </div>
+      <p id="load-state" role="status"></p>
+    </div>
+    <div class="intro-caption"><span>青丘九尾</span><span>北冥鲲影</span><span>帝江云阙</span></div>
+  </section>
+
+  <dialog id="new-journey-dialog" class="journey-reset" aria-labelledby="new-journey-title">
+    <div class="panel-heading"><div><p class="eyebrow">山海异闻 · 另起一卷</p><h2 id="new-journey-title">重新启程</h2></div><button data-close aria-label="保留当前旅程">×</button></div>
+    <p class="muted">新的旅程会回到拾遗工坊，四枚机芯与沿途异闻也将重新散落山海。</p>
+    <p class="reset-warning">当前旅程的进度将被替换，此操作无法撤回。</p>
+    <div class="panel-actions"><button id="keep-journey" type="button">保留旧旅程</button><button id="confirm-new-journey" class="primary" type="button">进入新旅程</button></div>
+  </dialog>
+
+  <dialog id="map-dialog">
+    <div class="panel-heading"><div><p class="eyebrow">山海图志</p><h2>山海舆图</h2></div><button data-close aria-label="关闭山海舆图">×</button></div>
+    <div class="map-wrap"><canvas id="map" width="820" height="575" aria-label="山海舆图，包含河道、桥梁、地标和异闻"></canvas></div>
+    <div id="map-sites" class="site-list"></div>
+    <p class="panel-note">选中地标后，探索界面会给出方向与距离。</p>
+  </dialog>
+
+  <dialog id="bench-dialog">
+    <div class="panel-heading"><div><p class="eyebrow">机身模块</p><h2>拆装</h2></div><button data-close aria-label="关闭拆装面板">×</button></div>
+    <p class="muted">拆下的灯可以拿在手里，也可以借给河边的灯桩。</p>
+    <div class="module-list" id="modules"></div>
+  </dialog>
+
+  <dialog id="journal-dialog">
+    <div class="panel-heading"><div><p class="eyebrow">河湾工坊</p><h2>留一张便笺</h2></div><button data-close aria-label="关闭便笺">×</button></div>
+    <label class="muted" for="note">今天的路上，有什么想记住的？</label>
+    <textarea id="note" maxlength="800" rows="5" placeholder="今天走到了……"></textarea>
+    <div class="panel-actions"><button id="save-note" class="primary">收进抽屉</button></div>
+  </dialog>
+
+  <dialog id="conversation-dialog" aria-labelledby="conversation-name">
+    <div class="panel-heading"><div><p id="conversation-role" class="eyebrow"></p><h2 id="conversation-name"></h2></div><button data-close aria-label="结束交谈">×</button></div>
+    <div id="conversation-text" class="conversation"></div>
+    <div id="conversation-actions" class="conversation-actions"></div>
+  </dialog>
+
+  <dialog id="journey-dialog" aria-labelledby="journey-title">
+    <div class="panel-heading"><div><p id="journey-summary" class="eyebrow"></p><h2 id="journey-title">工坊委托</h2></div><button data-close aria-label="关闭委托">×</button></div>
+    <div class="panel-actions journey-feature"><button id="ferry-event-open" type="button">涨水夜的最后一班渡</button></div>
+    <div id="journey-jobs" class="module-list"></div>
+    <div id="journey-resets" class="conversation-actions"></div>
+  </dialog>
+
+  <dialog id="ferry-event-dialog" aria-labelledby="ferry-event-title">
+    <div class="panel-heading"><div><p id="ferry-event-state" class="eyebrow"></p><h2 id="ferry-event-title">涨水夜的最后一班渡</h2></div><button data-close aria-label="关闭最后一班渡">×</button></div>
+    <div id="ferry-event-text" class="conversation"></div>
+    <div id="ferry-event-actions" class="conversation-actions"></div>
+  </dialog>
+
+  <dialog id="expedition-dialog" aria-labelledby="expedition-title">
+    <div class="panel-heading"><div><p id="expedition-summary" class="eyebrow"></p><h2 id="expedition-title">山海异闻</h2></div><button data-close aria-label="关闭山海异闻">×</button></div>
+    <p class="muted">机芯藏在山河各处，没有固定寻找顺序。有些异闻，只有潜入水下或飞上云端才能看见。</p>
+    <div id="expedition-list" class="module-list"></div>
+  </dialog>
+
+  <dialog id="settings-dialog">
+    <div class="panel-heading"><div><p class="eyebrow">游玩设置</p><h2>停一会儿</h2></div><button data-close aria-label="关闭设置">×</button></div>
+    <div class="setting"><label for="volume">声音大小</label><input id="volume" type="range" min="0" max="100" value="55"></div>
+    <div class="setting"><label for="record-file">留声机唱片</label><div class="record-actions"><button id="record-import">导入音乐</button><input id="record-file" type="file" accept="audio/*" hidden></div></div>
+    <div class="setting"><label for="render-scale">画面分辨率</label><select id="render-scale"><option value="1">标准</option><option value="0.75">轻量</option><option value="1.4">清晰</option></select></div>
+    <div class="setting"><label for="freeze-time">停住当前时刻</label><input id="freeze-time" type="checkbox"></div>
+    <div class="setting"><label for="immersion">沉浸模式</label><button id="immersion">隐藏界面</button></div>
+    <div class="panel-actions"><button id="return-home">回工坊</button><button id="fullscreen">全屏</button></div>
+    <div class="controls-help" aria-label="操作按键说明">
+      <h3>操作按键</h3>
+      <dl>
+        <div><dt>移动 / 视角</dt><dd>点击地面 · WASD / 拖动画面</dd></div>
+        <div><dt>互动 / 变形</dt><dd><kbd>E</kbd> / <kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> <kbd>4</kbd></dd></div>
+        <div><dt>机芯冲击</dt><dd><kbd>F</kbd> 攻击近处异兽，红色光圈出现时及时躲开</dd></div>
+        <div><dt>云翼升空</dt><dd>取得云翼后按 <kbd>4</kbd>，按住 <kbd>空格</kbd></dd></div>
+        <div><dt>云翼降落</dt><dd>按住 <kbd>C</kbd> 下降，接近地面按 <kbd>1</kbd> 落地</dd></div>
+        <div><dt>小舟潜水</dt><dd>取得渊甲后按 <kbd>C</kbd> 下潜，<kbd>空格</kbd> 上浮</dd></div>
+        <div><dt>地图 / 异闻 / 拆装</dt><dd><kbd>M</kbd> / <kbd>B</kbd> / <kbd>Q</kbd></dd></div>
+      </dl>
+    </div>
+  </dialog>
+
+  <div id="poem" class="poem glass" hidden>
+    <p id="poem-title" class="eyebrow"></p><p id="poem-lines"></p><div><button id="read-poem">听诗</button><button id="close-poem">收起</button></div>
+  </div>
+  <div id="compass" class="glass compass" hidden><span id="bearing"></span><span id="distance"></span><button id="clear-waypoint" aria-label="取消指路">×</button></div>
+  <noscript>这个世界需要启用 JavaScript 才能进入。</noscript>
+</body>
+</html>
